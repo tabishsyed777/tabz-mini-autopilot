@@ -8,6 +8,7 @@ Examples
 Open http://localhost:5000 to see the dashboard and switch modes.
 """
 import argparse
+import os
 import time
 
 import cv2
@@ -93,6 +94,7 @@ def main():
     ap.add_argument("--no-motors", action="store_true", help="force camera/sensor dry run")
     ap.add_argument("--dashboard-host", default=CFG.dash_host,
                     help="dashboard bind address; default localhost (LAN access has no authentication)")
+    ap.add_argument("--dashboard-port", type=int, default=int(os.environ.get("PORT", CFG.dash_port)))
     ap.add_argument("--record", action="store_true", help="start recording straight away")
     ap.add_argument("--seed", type=int, default=0)
     ap.set_defaults(sim=False, camera=None)
@@ -112,8 +114,8 @@ def main():
     lane, signs, planner = LaneDetector(), SignDetector(), Planner()
     state = SharedState()
     state.mode, state.record = args.mode, args.record
-    start_dashboard(state, args.dashboard_host, CFG.dash_port)
-    print(f"Dashboard: http://localhost:{CFG.dash_port}  (mode: {args.mode})")
+    start_dashboard(state, args.dashboard_host, args.dashboard_port)
+    print(f"Dashboard: http://localhost:{args.dashboard_port}  (mode: {args.mode})")
     if args.dashboard_host not in ("127.0.0.1", "localhost", "::1"):
         print("WARNING: dashboard is unauthenticated and includes driving controls; expose it only on a trusted network.")
     if args.camera == "pi" and not args.sim:

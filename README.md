@@ -33,6 +33,15 @@ dev container configuration that installs the Python requirements and forwards t
 dashboard port. [GitHub's Codespaces docs](https://docs.github.com/en/codespaces/setting-up-your-project-for-codespaces/adding-a-dev-container-configuration/setting-up-your-python-project-for-codespaces)
 describe how this configuration is used.
 
+## Publish a live simulator
+
+This repository includes a Render Blueprint for the simulator. Open [Render's Blueprint
+deployment page](https://render.com/deploy?repo=https://github.com/tabishsyed777/tabz-mini-autopilot),
+connect your GitHub account, and create the service. Render will build the app and provide
+its public URL when deployment completes. The free plan may sleep when idle, so the first
+visit after inactivity can take longer. The hosted version runs the virtual car only; it
+has no connection to physical motors.
+
 ## What it does
 
 | Feature | How it works |

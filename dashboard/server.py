@@ -132,9 +132,8 @@ def create_app(state: SharedState) -> Flask:
 
 def start(state: SharedState, host: str, port: int):
     app = create_app(state)
-    import logging
-    logging.getLogger("werkzeug").setLevel(logging.ERROR)
-    t = threading.Thread(target=lambda: app.run(host=host, port=port, threaded=True, use_reloader=False),
+    from waitress import serve
+    t = threading.Thread(target=lambda: serve(app, host=host, port=port, threads=8),
                          daemon=True)
     t.start()
     return t

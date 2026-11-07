@@ -2,3 +2,4 @@ numpy>=1.24
 opencv-python>=4.8        # on Raspberry Pi OS you can use: sudo apt install python3-opencv
 flask>=3.0
 onnxruntime>=1.17         # runs the trained model on the Pi
+waitress>=3.0              # production WSGI server for hosted dashboard
