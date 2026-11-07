@@ -18,6 +18,10 @@ python run.py
 You will see a simulated car follow a winding road, stop at a stop sign, wait at a red
 light, and brake for an obstacle, while the dashboard shows the scene.
 
+## Dashboard preview
+
+![Mini Autopilot simulator dashboard](assets/autopilot-dashboard.jpg)
+
 ## Run it in GitHub Codespaces
 
 Open this repository on GitHub, choose **Code → Codespaces → Create codespace on main**,
