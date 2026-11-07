@@ -1,0 +1,12 @@
+{
+  "name": "Mini Autopilot",
+  "image": "mcr.microsoft.com/devcontainers/python:0-3.11-bullseye",
+  "postCreateCommand": "python -m pip install -r requirements.txt",
+  "forwardPorts": [5000],
+  "portsAttributes": {
+    "5000": {
+      "label": "Mini Autopilot dashboard",
+      "onAutoForward": "openBrowser"
+    }
+  }
+}

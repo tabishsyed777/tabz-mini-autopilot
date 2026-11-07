@@ -18,6 +18,21 @@ python run.py
 You will see a simulated car follow a winding road, stop at a stop sign, wait at a red
 light, and brake for an obstacle, while the dashboard shows the scene.
 
+## Run it in GitHub Codespaces
+
+Open this repository on GitHub, choose **Code → Codespaces → Create codespace on main**,
+and wait for dependency installation to finish. In the Codespaces terminal, run:
+
+```bash
+python run.py --dashboard-host 0.0.0.0
+```
+
+Open port 5000 from the **Ports** panel when it appears. Codespaces runs the simulator;
+it cannot access your Raspberry Pi or physical car hardware. This repository includes a
+dev container configuration that installs the Python requirements and forwards the
+dashboard port. [GitHub's Codespaces docs](https://docs.github.com/en/codespaces/setting-up-your-project-for-codespaces/adding-a-dev-container-configuration/setting-up-your-python-project-for-codespaces)
+describe how this configuration is used.
+
 ## What it does
 
 | Feature | How it works |
@@ -26,13 +41,13 @@ light, and brake for an obstacle, while the dashboard shows the scene.
 | Stop signs | Red octagon detection, distance estimated from its size, 3 second stop |
 | Traffic lights | Red/green disc detection inside a dark housing; waits for green |
 | Obstacle braking | HC-SR04 ultrasonic sensor on a Pi: slows down, then emergency stops |
-| Tesla-style dashboard | Perspective road, blue path ribbon (red when braking), signs and obstacles drawn live |
+| Live scene dashboard | Perspective road, planned path, signs, obstacles, telemetry and manual controls |
 | Data engine | Drive manually while recording, train, redeploy. In autopilot mode the car also saves frames where the net and the lane detector disagree, so you can fix its weak spots |
 
 ## Project layout
 
 ```
-  run.py                 main loop (simulator, camera dry run, or explicitly armed car)
+run.py                 main loop (simulator, camera dry run, or explicitly armed car)
 train.py               train the steering network, exports models/autopilot.onnx
 autopilot/
   config.py            every tunable number and GPIO pin
@@ -44,7 +59,7 @@ autopilot/
   sim.py               built-in driving simulator
   hardware/            Pi camera, L298N motor, servo, ultrasonic drivers
 dashboard/             Flask server + the web UI
-tools/                 sim_test.py (self-test), make_sim_dataset.py
+tools/                 sim_test.py (scenario summary), make_sim_dataset.py
 docs/                  WIRING.md, BUILD_GUIDE.md
 ```
 
