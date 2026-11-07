@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mini Autopilot</title>
+<style>
+  :root {
+    --bg: #101318;
+    --panel: #171b22;
+    --line: #262c36;
+    --text: #e8eaed;
+    --muted: #8b93a1;
+    --blue: #3e6ae1;
+    --red: #e5484d;
+    --amber: #f2b84b;
+    --green: #46c28a;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "Gotham", "Montserrat", "Helvetica Neue", Arial, system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .app { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.9fr); gap: 14px; height: 100%; padding: 14px; }
+
+  /* ---------- scene ---------- */
+  .scene { position: relative; border-radius: 18px; overflow: hidden; background: #0c0f13; border: 1px solid var(--line); min-height: 340px; }
+  #scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .power { position: absolute; left: 26px; top: 20px; }
+  .power b { font-size: clamp(48px, 7vw, 84px); font-weight: 500; letter-spacing: -0.03em; line-height: 1; }
+  .power span { display: block; margin-top: 4px; color: var(--muted); font-size: 14px; }
+  .pill {
+    position: absolute; left: 50%; top: 20px; transform: translateX(-50%);
+    padding: 9px 18px; border-radius: 999px; font-size: 14px; font-weight: 500;
+    background: rgba(23,27,34,.86); border: 1px solid var(--line); white-space: nowrap;
+    transition: background .25s, border-color .25s;
+  }
+  .pill i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 9px; background: var(--muted); }
+  .pill[data-tone=drive] i { background: var(--blue); }
+  .pill[data-tone=stop] { border-color: var(--red); } .pill[data-tone=stop] i { background: var(--red); }
+  .pill[data-tone=wait] { border-color: var(--amber); } .pill[data-tone=wait] i { background: var(--amber); }
+  .pill[data-tone=manual] i { background: var(--green); }
+  .gear { position: absolute; right: 24px; top: 22px; text-align: right; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .gear strong { color: var(--text); font-weight: 500; }
+
+  /* ---------- side panel ---------- */
+  .side { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; }
+  .card { flex: none; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .card h2 { font-size: 15px; font-weight: 500; margin-bottom: 10px; }
+  .cam { position: relative; padding: 0; overflow: hidden; }
+  .cam img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #0c0f13; }
+  .cam .chip { position: absolute; right: 10px; bottom: 10px; background: rgba(16,19,24,.8); border-radius: 999px; padding: 3px 10px; font-size: 12px; color: var(--muted); }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); background: #0f1217; border-radius: 10px; padding: 3px; gap: 3px; }
+  .seg button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 13px; padding: 9px 4px; border-radius: 8px; cursor: pointer; }
+  .seg button[aria-pressed=true] { background: var(--blue); color: #fff; }
+  .seg button:disabled { opacity: .4; cursor: not-allowed; }
+  .hint { color: var(--muted); font-size: 12.5px; margin-top: 8px; line-height: 1.45; }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .btn { flex: 1; border: 1px solid var(--line); background: #0f1217; color: var(--text); font: inherit; font-size: 14px; padding: 11px; border-radius: 10px; cursor: pointer; }
+  .btn:focus-visible, .seg button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .btn.rec[aria-pressed=true] { border-color: var(--red); color: var(--red); }
+  .btn.estop { background: var(--red); border-color: var(--red); color: #fff; font-weight: 500; }
+  .meter { position: relative; height: 8px; border-radius: 6px; background: #0f1217; margin: 8px 0 4px; }
+  .meter .mid { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--line); }
+  .meter .fill { position: absolute; top: 0; bottom: 0; background: var(--blue); border-radius: 6px; }
+  .kv { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+  .kv b { color: var(--text); font-weight: 500; }
+  #pad { touch-action: none; position: relative; width: 150px; height: 150px; margin: 4px auto 0; border-radius: 50%; background: #0f1217; border: 1px solid var(--line); }
+  #knob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; background: var(--blue); }
+  #log { font-size: 12.5px; color: var(--muted); line-height: 1.6; max-height: 96px; overflow: hidden; }
+
+  @media (max-width: 860px) {
+    html, body { height: auto; }
+    .app { grid-template-columns: 1fr; height: auto; }
+    .scene { height: 58vh; }
+    .side { overflow: visible; }
+  }
+  @media (prefers-reduced-motion: reduce) { .pill { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="scene" aria-label="Scene view">
+    <canvas id="scene"></canvas>
+    <div class="power"><b id="power">0</b><span>motor power, %</span></div>
+    <div class="pill" id="pill" data-tone="manual"><i></i><span id="pillText">Connecting</span></div>
+    <div class="gear"><strong id="modeLabel">Manual</strong><br><span id="reason">Waiting for the car</span></div>
+  </section>
+
+  <aside class="side">
+    <div class="card cam">
+      <img id="cam" src="/video" alt="Live camera view with lane and object overlays">
+      <span class="chip" id="fps">0 fps</span>
+    </div>
+
+    <div class="card">
+      <h2>Driving mode</h2>
+      <div class="seg" role="group" aria-label="Driving mode">
+        <button data-mode="manual" aria-pressed="true">Manual</button>
+        <button data-mode="classic" aria-pressed="false">Lane detector</button>
+        <button data-mode="auto" aria-pressed="false" id="btnAuto">Neural net</button>
+      </div>
+      <p class="hint" id="modeHint">Drive with the arrow keys or W A S D, or use the joystick below.</p>
+    </div>
+
+    <div class="card">
+      <div class="kv"><span>Steering</span><b id="steerTxt">0.00</b></div>
+      <div class="meter"><div class="mid"></div><div class="fill" id="steerFill"></div></div>
+      <div class="kv" style="margin-top:10px"><span>Obstacle distance</span><b id="usTxt">none</b></div>
+      <div class="kv" style="margin-top:6px"><span>Lane confidence</span><b id="confTxt">0%</b></div>
+      <div class="kv" style="margin-top:6px"><span>Network says / lane detector says</span><b id="cmpTxt">no model</b></div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button class="btn rec" id="rec" aria-pressed="false">Record driving</button>
+      <button class="btn estop" id="estop" aria-pressed="false">Emergency stop</button>
+      </div>
+      <p class="hint" id="recHint">Recording saves camera frames and your steering into the data folder for training.</p>
+      <div id="pad" aria-label="Joystick: drag to steer and drive"><div id="knob"></div></div>
+    </div>
+
+    <div class="card"><div id="log"></div></div>
+  </aside>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const post = (url, body) => fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)}).catch(() => {});
+
+/* ---------------- state from the car ---------------- */
+let S = {steer: 0, power: 0, plan: "MANUAL", mode: "manual", objects: [], lane_offset: 0, lane_curve: 0, ultrasonic_cm: 400};
+let V = {offset: 0, curve: 0, steer: 0};            // smoothed values used for drawing
+let lastPlan = "";
+
+const TONES = {
+  DRIVE: ["Autopilot driving", "drive"], MANUAL: ["Manual driving", "manual"],
+  STOP_SIGN: ["Stopping at stop sign", "wait"], RED_LIGHT: ["Waiting at red light", "wait"],
+  EMERGENCY: ["Obstacle: braking", "stop"], "E-STOP": ["Emergency stop", "stop"],
+};
+const MODE_NAMES = {manual: "Manual", classic: "Lane detector autopilot", auto: "Neural network autopilot"};
+
+async function poll() {
+  try {
+    const r = await fetch("/api/state"); S = await r.json(); render();
+  } catch (e) { $("pillText").textContent = "Car not reachable"; }
+  setTimeout(poll, 80);
+}
+
+function render() {
+  const [txt, tone] = TONES[S.plan] || [S.plan, "manual"];
+  $("pillText").textContent = txt; $("pill").dataset.tone = tone;
+  $("power").textContent = S.power ?? 0;
+  $("modeLabel").textContent = MODE_NAMES[S.mode] || S.mode;
+  $("estop").textContent = S.estop ? "Reset emergency stop" : "Emergency stop";
+  $("estop").setAttribute("aria-pressed", String(!!S.estop));
+  $("reason").textContent = S.reason || "";
+  $("fps").textContent = (S.fps ?? 0).toFixed(0) + " fps";
+  const st = S.steer ?? 0;
+  $("steerTxt").textContent = (st >= 0 ? "+" : "") + st.toFixed(2);
+  const f = $("steerFill"); f.style.left = (st < 0 ? 50 + st * 50 : 50) + "%"; f.style.width = Math.abs(st) * 50 + "%";
+  $("usTxt").textContent = S.ultrasonic_cm >= 399 ? "none in range" : Math.round(S.ultrasonic_cm) + " cm";
+  $("confTxt").textContent = Math.round((S.lane_conf || 0) * 100) + "%";
+  $("cmpTxt").textContent = S.net_steer == null ? "no model yet" : `${S.net_steer.toFixed(2)} / ${(S.lane_steer ?? 0).toFixed(2)}`;
+  document.querySelectorAll(".seg button").forEach(b => {
+    b.setAttribute("aria-pressed", b.dataset.mode === S.mode);
+    b.disabled = !!S.estop;
+  });
+  $("btnAuto").disabled = !S.has_model;
+  $("modeHint").textContent = S.has_model || S.mode !== "auto" ? hintFor(S.mode)
+      : "No trained model found. Train one, then copy models/autopilot.onnx here.";
+  if (!S.has_model) $("modeHint").textContent = S.mode === "manual" ? hintFor("manual") + " The neural net unlocks after you train a model." : hintFor(S.mode);
+  const rec = $("rec"); rec.setAttribute("aria-pressed", !!S.record);
+  rec.textContent = S.record ? `Stop recording (${S.recording ?? 0} frames)` : "Record driving";
+  if (S.plan !== lastPlan) { addLog(txt + (S.reason ? ": " + S.reason : "")); lastPlan = S.plan; }
+}
+function hintFor(m) {
+  return {manual: "Drive with the arrow keys or W A S D, or use the joystick below.",
+          classic: "The car steers itself from lane lines found with OpenCV. No training needed.",
+          auto: "The neural network steers from the camera image. Safety rules still apply."}[m];
+}
+function addLog(t) {
+  const d = document.createElement("div"); d.textContent = new Date().toLocaleTimeString() + "  " + t;
+  const L = $("log"); L.prepend(d); while (L.children.length > 5) L.lastChild.remove();
+}
+
+document.querySelectorAll(".seg button").forEach(b => b.onclick = () => post("/api/mode", {mode: b.dataset.mode}));
+$("rec").onclick = () => post("/api/record", {on: !S.record});
+  $("estop").onclick = () => post(S.estop ? "/api/estop/reset" : "/api/estop", {});
+
+/* ---------------- manual driving: keyboard + joystick ---------------- */
+const keys = new Set(); let joy = {x: 0, y: 0, active: false}; let wasActive = false;
+addEventListener("keydown", e => {
+  if (e.code === "Space") { post("/api/estop", {}); e.preventDefault(); return; }
+  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","KeyW","KeyA","KeyS","KeyD"].includes(e.code)) { keys.add(e.code); e.preventDefault(); }
+});
+addEventListener("keyup", e => keys.delete(e.code));
+addEventListener("blur", () => keys.clear());
+setInterval(() => {
+  let steer = 0, thr = 0;
+  if (keys.has("ArrowLeft") || keys.has("KeyA")) steer -= 1;
+  if (keys.has("ArrowRight") || keys.has("KeyD")) steer += 1;
+  if (keys.has("ArrowUp") || keys.has("KeyW")) thr += 1;
+  if (keys.has("ArrowDown") || keys.has("KeyS")) thr -= 1;
+  if (joy.active) { steer = joy.x; thr = -joy.y; }
+  const active = steer !== 0 || thr !== 0;
+  if (active || wasActive) post("/api/control", {steer, throttle: thr});
+  wasActive = active;
+}, 80);
+
+const pad = $("pad"), knob = $("knob");
+function joyMove(e) {
+  const r = pad.getBoundingClientRect(), R = r.width / 2 - 26;
+  let x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
+  const m = Math.hypot(x, y); if (m > R) { x *= R / m; y *= R / m; }
+  joy = {x: x / R, y: y / R, active: true};
+  knob.style.transform = `translate(${x}px, ${y}px)`;
+}
+pad.addEventListener("pointerdown", e => { pad.setPointerCapture(e.pointerId); joyMove(e); });
+pad.addEventListener("pointermove", e => { if (joy.active) joyMove(e); });
+const joyEnd = () => { joy = {x: 0, y: 0, active: false}; knob.style.transform = ""; };
+pad.addEventListener("pointerup", joyEnd); pad.addEventListener("pointercancel", joyEnd);
+
+/* ---------------- scene: perspective road, path, objects, ego car ---------------- */
+const cv = $("scene"), ctx = cv.getContext("2d");
+let W = 0, H = 0, dpr = 1;
+function resize() {
+  dpr = Math.min(devicePixelRatio || 1, 2);
+  const r = cv.getBoundingClientRect(); W = r.width; H = r.height;
+  cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+new ResizeObserver(resize).observe(cv); resize();
+
+const A = 0.9, MAXD = 4.0;
+function proj(D, lat, g) {            // lat in lane widths, D in metres
+  const k = A / (A + D);
+  return {x: g.cx + lat * g.lane * k, y: g.hy + (g.by - g.hy) * k, k};
+}
+function laneCentre(D) { return -V.offset + V.curve * 1.1 * Math.pow(D / MAXD, 1.7); }
+
+function drawScene() {
+  requestAnimationFrame(drawScene);
+  // smooth the incoming numbers so the scene glides instead of jumping
+  const t = 0.18;
+  V.offset += ((S.lane_offset || 0) - V.offset) * t;
+  V.curve += ((S.lane_curve || 0) - V.curve) * t;
+  V.steer += ((S.steer || 0) - V.steer) * 0.25;
+
+  const g = {cx: W / 2, hy: H * 0.24, by: H * 0.9, lane: Math.min(W * 0.34, 330)};
+  ctx.clearRect(0, 0, W, H);
+  const sky = ctx.createLinearGradient(0, 0, 0, g.hy + 40);
+  sky.addColorStop(0, "#0c0f13"); sky.addColorStop(1, "#151a22");
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#12161c"; ctx.fillRect(0, g.hy, W, H - g.hy);
+
+  // ground grid lines give a sense of speed and depth
+  ctx.strokeStyle = "rgba(255,255,255,.035)"; ctx.lineWidth = 1;
+  for (let d = 0; d <= MAXD; d += 0.5) { const p = proj(d, 0, g); ctx.beginPath(); ctx.moveTo(0, p.y); ctx.lineTo(W, p.y); ctx.stroke(); }
+
+  // road surface
+  const steps = 40, L = [], R = [], C = [];
+  for (let i = 0; i <= steps; i++) {
+    const D = (i / steps) * MAXD, c = laneCentre(D);
+    L.push(proj(D, c - 0.5, g)); R.push(proj(D, c + 0.5, g)); C.push(proj(D, c, g));
+  }
+  ctx.beginPath(); L.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+  for (let i = R.length - 1; i >= 0; i--) ctx.lineTo(R[i].x, R[i].y); ctx.closePath();
+  const road = ctx.createLinearGradient(0, g.hy, 0, g.by); road.addColorStop(0, "#1b2029"); road.addColorStop(1, "#262c36");
+  ctx.fillStyle = road; ctx.fill();
+  ctx.lineWidth = 2.5; ctx.strokeStyle = "#cfd5de";
+  [L, R].forEach(E => { ctx.beginPath(); E.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke(); });
+  ctx.setLineDash([14, 20]); ctx.strokeStyle = "rgba(207,213,222,.45)"; ctx.lineWidth = 2;
+  ctx.beginPath(); C.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke(); ctx.setLineDash([]);
+
+  // planned path ribbon: blue while driving, amber when slowing, red when stopped
+  const stopped = ["STOP_SIGN", "RED_LIGHT", "EMERGENCY", "E-STOP"].includes(S.plan);
+  const auto = S.mode !== "manual";
+  const col = stopped ? "229,72,77" : (auto ? "62,106,225" : "70,194,138");
+  const reach = stopped ? 0.9 : Math.min(MAXD, 1.4 + (S.power || 0) / 18);
+  const rib = ctx.createLinearGradient(0, g.by, 0, g.hy);
+  rib.addColorStop(0, `rgba(${col},.55)`); rib.addColorStop(1, `rgba(${col},0)`);
+  ctx.beginPath();
+  const pts = []; for (let i = 0; i <= 24; i++) { const D = (i / 24) * reach; pts.push([D, laneCentre(D) * 0.55 + V.steer * 0.35 * (D / MAXD)]); }
+  pts.forEach(([D, c], i) => { const p = proj(D, c - 0.13, g); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); });
+  for (let i = pts.length - 1; i >= 0; i--) { const p = proj(pts[i][0], pts[i][1] + 0.13, g); ctx.lineTo(p.x, p.y); }
+  ctx.closePath(); ctx.fillStyle = rib; ctx.fill();
+
+  // objects, far to near so near ones draw on top
+  const objs = (S.objects || []).filter(o => o.dist != null).sort((a, b) => b.dist - a.dist);
+  objs.forEach(o => drawObject(o, g));
+
+  drawCar(g);
+}
+
+function drawObject(o, g) {
+  const D = Math.max(0.15, Math.min(MAXD, o.dist));
+  const lat = o.kind === "obstacle" ? (o.lateral || 0) * 0.5 - V.offset : (o.lateral || 0) * 1.0;
+  const p = proj(D, lat, g), s = p.k * g.lane * 0.2;
+  ctx.save(); ctx.translate(p.x, p.y);
+  if (o.kind === "obstacle") {
+    ctx.fillStyle = "rgba(242,184,75,.22)"; ctx.strokeStyle = "#f2b84b"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(-s, -s * 1.6, s * 2, s * 1.6, 4); ctx.fill(); ctx.stroke();
+  } else {
+    ctx.strokeStyle = "#7b8494"; ctx.lineWidth = Math.max(2, s * 0.14);
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -s * 2.4); ctx.stroke();
+    ctx.translate(0, -s * 2.8);
+    if (o.kind === "stop_sign") {
+      ctx.fillStyle = "#e5484d"; ctx.beginPath();
+      for (let i = 0; i < 8; i++) { const a = Math.PI / 8 + i * Math.PI / 4; ctx.lineTo(Math.cos(a) * s * 0.9, Math.sin(a) * s * 0.9); }
+      ctx.closePath(); ctx.fill(); ctx.fillStyle = "#fff"; ctx.fillRect(-s * 0.5, -s * 0.09, s, s * 0.18);
+    } else {
+      const green = o.kind === "green_light", c = green ? "#46c28a" : "#e5484d";
+      ctx.fillStyle = "#0b0d11"; ctx.beginPath(); ctx.roundRect(-s * 0.45, -s * 0.8, s * 0.9, s * 1.6, s * 0.3); ctx.fill();
+      ctx.shadowColor = c; ctx.shadowBlur = s * 0.9; ctx.fillStyle = c;
+      ctx.beginPath(); ctx.arc(0, green ? s * 0.4 : -s * 0.4, s * 0.3, 0, 7); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawCar(g) {
+  const w = g.lane * 0.2, h = w * 1.75, x = g.cx + V.offset * 0 , y = g.by + 8;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(V.steer * 0.12);
+  const glow = ctx.createRadialGradient(0, 0, 4, 0, 0, w * 1.6);
+  const braking = ["STOP_SIGN", "RED_LIGHT", "EMERGENCY", "E-STOP"].includes(S.plan);
+  glow.addColorStop(0, braking ? "rgba(229,72,77,.35)" : "rgba(62,106,225,.28)"); glow.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = glow; ctx.fillRect(-w * 2, -h * 1.2, w * 4, h * 2.4);
+  ctx.fillStyle = "#d9dde4"; ctx.beginPath(); ctx.roundRect(-w / 2, -h, w, h, w * 0.28); ctx.fill();
+  ctx.fillStyle = "#58606d"; ctx.beginPath(); ctx.roundRect(-w * 0.38, -h * 0.78, w * 0.76, h * 0.34, w * 0.14); ctx.fill();   // rear window
+  ctx.fillStyle = braking ? "#ff4a52" : "#8a2b30";                                                                            // tail lights
+  ctx.fillRect(-w * 0.46, -h * 0.1, w * 0.26, h * 0.05); ctx.fillRect(w * 0.2, -h * 0.1, w * 0.26, h * 0.05);
+  ctx.restore();
+}
+
+drawScene(); poll();
+</script>
+</body>
+</html>

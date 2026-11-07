@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+data/*
+!data/.gitkeep
+models/*.pt
+models/*.onnx
+.DS_Store
